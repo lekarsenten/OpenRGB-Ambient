@@ -1,5 +1,7 @@
 //
 
+#include <algorithm>
+
 #include <QPainter>
 
 #include <ResourceManager.h>
@@ -61,6 +63,7 @@ std::vector<QColor> LedPreviewWidget::collectRegionColors(ScreenRegion region) c
                 const int absFrom = static_cast<int>(zone.start_idx) + part.from;
                 const int absTo   = static_cast<int>(zone.start_idx) + part.to;
 
+                const int segStart = static_cast<int>(result.size());
                 for (int i = absFrom; i < absTo && i < static_cast<int>(colors.size()); ++i)
                 {
                     const RGBColor c = colors[i];
@@ -70,6 +73,11 @@ std::vector<QColor> LedPreviewWidget::collectRegionColors(ScreenRegion region) c
                         static_cast<int>((c >> 16) & 0xFF)
                     );
                 }
+                // Processor stores result[0] = bottom/right of screen by default.
+                // reversed=true means std::reverse was applied → result[0] = top/left → correct draw order.
+                // reversed=false → result[0] = bottom/right → must reverse for screen-coordinate display.
+                if (!part.reversed)
+                    std::reverse(result.begin() + segStart, result.end());
             }
         }
     }
