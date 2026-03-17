@@ -31,6 +31,9 @@ public:
     void selectController(const std::string &location);
     void unselectController(const std::string &location);
 
+    [[nodiscard]] bool isZoneEnabled(const std::string &location, const std::string &zoneName) const;
+    void setZoneEnabled(const std::string &location, const std::string &zoneName, bool enabled);
+
     [[nodiscard]] LedRange getTopRegion(const std::string &location) const;
     [[nodiscard]] LedRange getBottomRegion(const std::string &location) const;
     [[nodiscard]] LedRange getRightRegion(const std::string &location) const;
@@ -78,6 +81,7 @@ private:
     static QString RIGHT_SUFFIX;
 
     static QString ZONE_MAPPINGS_KEY;
+    static QString DISABLED_ZONES_KEY;
     static QString MONITOR_ADAPTER_KEY;
     static QString MONITOR_OUTPUT_KEY;
 
@@ -87,6 +91,7 @@ private:
     QSettings settings;
 
     std::unordered_set<std::string> selectedControllers;
+    std::unordered_set<std::string> disabledZones; // key: "location|zoneName"
 
     RegionMap topRegions;
     RegionMap bottomRegions;
@@ -106,6 +111,7 @@ private:
     float smoothingWeight = 0.5;
 
     void syncSelectedControllers();
+    void syncDisabledZones();
     void syncRegions(const RegionMap &map, const QString &key);
     void syncZoneMappings();
 

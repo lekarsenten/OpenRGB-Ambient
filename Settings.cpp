@@ -18,6 +18,7 @@ QString Settings::BOTTOM_SUFFIX = "_Bottom"; // NOLINT(cert-err58-cpp)
 QString Settings::LEFT_SUFFIX = "_Left"; // NOLINT(cert-err58-cpp)
 QString Settings::RIGHT_SUFFIX = "_Right"; // NOLINT(cert-err58-cpp)
 QString Settings::ZONE_MAPPINGS_KEY   = "ZoneMappings"; // NOLINT(cert-err58-cpp)
+QString Settings::DISABLED_ZONES_KEY  = "DisabledZones"; // NOLINT(cert-err58-cpp)
 QString Settings::MONITOR_ADAPTER_KEY = "MonitorAdapter"; // NOLINT(cert-err58-cpp)
 QString Settings::MONITOR_OUTPUT_KEY  = "MonitorOutput"; // NOLINT(cert-err58-cpp)
 
@@ -36,6 +37,10 @@ Settings::Settings(const QString &file, QObject *parent)
 
     fillZoneParts(zoneParts, settings.value(ZONE_MAPPINGS_KEY).toHash());
 
+    const auto disabledList = settings.value(DISABLED_ZONES_KEY).toStringList();
+    for (const auto &key : disabledList)
+        disabledZones.insert(key.toStdString());
+
     coolWhiteCompensation = settings.value(COOL_WHITE_COMPENSATION_KEY, true).toBool();
     colorTemperatureIndex = std::clamp(
             settings.value(COLOR_TEMPERATURE_KEY, colorTemperatureIndex).toInt(),
@@ -52,6 +57,30 @@ Settings::Settings(const QString &file, QObject *parent)
 
 bool Settings::isControllerSelected(const std::string &location) const {
     return selectedControllers.find(location) != std::end(selectedControllers);
+}
+
+bool Settings::isZoneEnabled(const std::string &location, const std::string &zoneName) const
+{
+    return disabledZones.find(location + "|" + zoneName) == std::end(disabledZones);
+}
+
+void Settings::setZoneEnabled(const std::string &location, const std::string &zoneName, bool enabled)
+{
+    const auto key = location + "|" + zoneName;
+    if (enabled)
+        disabledZones.erase(key);
+    else
+        disabledZones.insert(key);
+    syncDisabledZones();
+}
+
+void Settings::syncDisabledZones()
+{
+    QStringList value;
+    for (const auto &key : disabledZones)
+        value.append(QString::fromStdString(key));
+    settings.setValue(DISABLED_ZONES_KEY, value);
+    emit settingsChanged();
 }
 
 void Settings::selectController(const std::string &location) {
