@@ -13,8 +13,10 @@
 #include <d3d11.h>
 
 #include <QObject>
+#include <QString>
 
 #include <OpenRGBPluginInterface.h>
+#include <RGBController.h>
 
 #include "ImageProcessor.h"
 #include "Settings.h"
@@ -55,6 +57,7 @@ public slots:
 
 signals:
     void previewUpdated(const QImage &image);
+    void ledColorsUpdated(const QString &location, std::vector<RGBColor> colors);
 
 private:
     static const TCHAR *END_SESSION_WND_CLASS;

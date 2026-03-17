@@ -8,11 +8,13 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <string>
+#include <vector>
 
 #include <QSettings>
 #include <QObject>
 
 #include "LedRange.h"
+#include "ZoneMapping.h"
 
 class ResourceManager;
 class QString;
@@ -38,6 +40,14 @@ public:
     void setBottomRegion(const std::string &location, LedRange range);
     void setRightRegion(const std::string &location, LedRange range);
     void setLeftRegion(const std::string &location, LedRange range);
+
+    [[nodiscard]] std::vector<ZonePart> getZoneParts(const std::string &location, const std::string &zoneName) const;
+    void setZoneParts(const std::string &location, const std::string &zoneName, std::vector<ZonePart> parts);
+
+    [[nodiscard]] int monitorAdapter() const noexcept;
+    [[nodiscard]] int monitorOutput() const noexcept;
+    void setMonitorAdapter(int index);
+    void setMonitorOutput(int index);
 
     [[nodiscard]] bool compensateCoolWhite() const noexcept;
     void setCoolWhiteCompensation(bool value);
@@ -67,7 +77,12 @@ private:
     static QString LEFT_SUFFIX;
     static QString RIGHT_SUFFIX;
 
-    using RegionMap = std::unordered_map<std::string, LedRange>;
+    static QString ZONE_MAPPINGS_KEY;
+    static QString MONITOR_ADAPTER_KEY;
+    static QString MONITOR_OUTPUT_KEY;
+
+    using RegionMap     = std::unordered_map<std::string, LedRange>;
+    using ZonePartsMap  = std::unordered_map<std::string, std::vector<ZonePart>>; // key: "location|zoneName"
 
     QSettings settings;
 
@@ -78,6 +93,11 @@ private:
     RegionMap rightRegions;
     RegionMap leftRegions;
 
+    ZonePartsMap zoneParts;
+
+    int monitorAdapterIndex = 0;
+    int monitorOutputIndex  = 0;
+
     bool coolWhiteCompensation = true;
 
     int colorTemperatureIndex = 55; // 6500K
@@ -87,9 +107,11 @@ private:
 
     void syncSelectedControllers();
     void syncRegions(const RegionMap &map, const QString &key);
+    void syncZoneMappings();
 
     static void fillRegions(RegionMap &map, const QVariantHash &data);
     [[nodiscard]] static LedRange findRange(const RegionMap &map, const std::string &location);
+    static void fillZoneParts(ZonePartsMap &map, const QVariantHash &data);
 };
 
 #endif //OPENRGB_AMBIENT_SETTINGS_H
