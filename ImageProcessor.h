@@ -21,6 +21,7 @@
 #include "ColorPostProcessor.h"
 #include "LedUpdateEvent.h"
 #include "LedRange.h"
+#include "ZoneMapping.h"
 
 class QObject;
 
@@ -37,10 +38,12 @@ class ImageProcessor final
 {
 public:
     ImageProcessor(std::string controllerLocation,
+                   int totalLeds,
                    LedRange topRange,
                    LedRange bottomRange,
                    LedRange rightRange,
                    LedRange leftRange,
+                   std::vector<ZoneLedRange> zoneMappings,
                    std::array<float, 3> colorFactors,
                    CPP colorPostProcessor,
                    QObject *eventReceiver)
@@ -58,8 +61,37 @@ public:
             , bottomHdrProcessor{bottomRange.getLength(), colorFactors, colorPostProcessor}
             , leftHdrProcessor{leftRange.getLength(), colorFactors, colorPostProcessor}
             , rightHdrProcessor{rightRange.getLength(), colorFactors, colorPostProcessor}
-            , colors(topRange.getLength() + bottomRange.getLength() + leftRange.getLength() + rightRange.getLength())
+            , colors(totalLeds)
     {
+        for (const auto &z : zoneMappings)
+        {
+            const auto len = z.range.getLength();
+            switch (z.region)
+            {
+                case ScreenRegion::Top:
+                    topZoneEntries.push_back({z.range, z.reversed});
+                    topSdrZoneProcs.emplace_back(len, colorFactors, colorPostProcessor);
+                    topHdrZoneProcs.emplace_back(len, colorFactors, colorPostProcessor);
+                    break;
+                case ScreenRegion::Bottom:
+                    bottomZoneEntries.push_back({z.range, z.reversed});
+                    bottomSdrZoneProcs.emplace_back(len, colorFactors, colorPostProcessor);
+                    bottomHdrZoneProcs.emplace_back(len, colorFactors, colorPostProcessor);
+                    break;
+                case ScreenRegion::Left:
+                    leftZoneEntries.push_back({z.range, z.reversed});
+                    leftSdrZoneProcs.emplace_back(len, colorFactors, colorPostProcessor);
+                    leftHdrZoneProcs.emplace_back(len, colorFactors, colorPostProcessor);
+                    break;
+                case ScreenRegion::Right:
+                    rightZoneEntries.push_back({z.range, z.reversed});
+                    rightSdrZoneProcs.emplace_back(len, colorFactors, colorPostProcessor);
+                    rightHdrZoneProcs.emplace_back(len, colorFactors, colorPostProcessor);
+                    break;
+                default:
+                    break;
+            }
+        }
     }
 
     void processSdrImage(const uchar *data, int width, int height, int stridePixels) override
@@ -76,6 +108,39 @@ public:
         bottomSdrProcessor.processRegion(colors.data() + realBottom, data + 4 * stridePixels * (height - sampleHeight), width, sampleHeight, stridePixels);
         leftSdrProcessor.processRegion(colors.data() + realLeft, data, sampleWidth, height, 0, stridePixels);
         rightSdrProcessor.processRegion(colors.data() + realRight, data, sampleWidth, height, width - sampleWidth, stridePixels);
+
+        for (auto i = 0u; i < topZoneEntries.size(); ++i)
+        {
+            const auto start = std::min(topZoneEntries[i].range.from, topZoneEntries[i].range.to);
+            const auto len = topZoneEntries[i].range.getLength();
+            topSdrZoneProcs[i].processRegion(colors.data() + start, data, width, sampleHeight, stridePixels);
+            if (topZoneEntries[i].reversed)
+                std::reverse(colors.data() + start, colors.data() + start + len);
+        }
+        for (auto i = 0u; i < bottomZoneEntries.size(); ++i)
+        {
+            const auto start = std::min(bottomZoneEntries[i].range.from, bottomZoneEntries[i].range.to);
+            const auto len = bottomZoneEntries[i].range.getLength();
+            bottomSdrZoneProcs[i].processRegion(colors.data() + start, data + 4 * stridePixels * (height - sampleHeight), width, sampleHeight, stridePixels);
+            if (bottomZoneEntries[i].reversed)
+                std::reverse(colors.data() + start, colors.data() + start + len);
+        }
+        for (auto i = 0u; i < leftZoneEntries.size(); ++i)
+        {
+            const auto start = std::min(leftZoneEntries[i].range.from, leftZoneEntries[i].range.to);
+            const auto len = leftZoneEntries[i].range.getLength();
+            leftSdrZoneProcs[i].processRegion(colors.data() + start, data, sampleWidth, height, 0, stridePixels);
+            if (leftZoneEntries[i].reversed)
+                std::reverse(colors.data() + start, colors.data() + start + len);
+        }
+        for (auto i = 0u; i < rightZoneEntries.size(); ++i)
+        {
+            const auto start = std::min(rightZoneEntries[i].range.from, rightZoneEntries[i].range.to);
+            const auto len = rightZoneEntries[i].range.getLength();
+            rightSdrZoneProcs[i].processRegion(colors.data() + start, data, sampleWidth, height, width - sampleWidth, stridePixels);
+            if (rightZoneEntries[i].reversed)
+                std::reverse(colors.data() + start, colors.data() + start + len);
+        }
 
         QCoreApplication::postEvent(eventReceiver, new LedUpdateEvent{controllerLocation, colors});
     }
@@ -94,6 +159,39 @@ public:
         bottomHdrProcessor.processRegion(colors.data() + realBottom, data + stridePixels * (height - sampleHeight), width, sampleHeight, stridePixels);
         leftHdrProcessor.processRegion(colors.data() + realLeft, data, sampleWidth, height, 0, stridePixels);
         rightHdrProcessor.processRegion(colors.data() + realRight, data, sampleWidth, height, width - sampleWidth, stridePixels);
+
+        for (auto i = 0u; i < topZoneEntries.size(); ++i)
+        {
+            const auto start = std::min(topZoneEntries[i].range.from, topZoneEntries[i].range.to);
+            const auto len = topZoneEntries[i].range.getLength();
+            topHdrZoneProcs[i].processRegion(colors.data() + start, data, width, sampleHeight, stridePixels);
+            if (topZoneEntries[i].reversed)
+                std::reverse(colors.data() + start, colors.data() + start + len);
+        }
+        for (auto i = 0u; i < bottomZoneEntries.size(); ++i)
+        {
+            const auto start = std::min(bottomZoneEntries[i].range.from, bottomZoneEntries[i].range.to);
+            const auto len = bottomZoneEntries[i].range.getLength();
+            bottomHdrZoneProcs[i].processRegion(colors.data() + start, data + stridePixels * (height - sampleHeight), width, sampleHeight, stridePixels);
+            if (bottomZoneEntries[i].reversed)
+                std::reverse(colors.data() + start, colors.data() + start + len);
+        }
+        for (auto i = 0u; i < leftZoneEntries.size(); ++i)
+        {
+            const auto start = std::min(leftZoneEntries[i].range.from, leftZoneEntries[i].range.to);
+            const auto len = leftZoneEntries[i].range.getLength();
+            leftHdrZoneProcs[i].processRegion(colors.data() + start, data, sampleWidth, height, 0, stridePixels);
+            if (leftZoneEntries[i].reversed)
+                std::reverse(colors.data() + start, colors.data() + start + len);
+        }
+        for (auto i = 0u; i < rightZoneEntries.size(); ++i)
+        {
+            const auto start = std::min(rightZoneEntries[i].range.from, rightZoneEntries[i].range.to);
+            const auto len = rightZoneEntries[i].range.getLength();
+            rightHdrZoneProcs[i].processRegion(colors.data() + start, data, sampleWidth, height, width - sampleWidth, stridePixels);
+            if (rightZoneEntries[i].reversed)
+                std::reverse(colors.data() + start, colors.data() + start + len);
+        }
 
         QCoreApplication::postEvent(eventReceiver, new LedUpdateEvent{controllerLocation, colors});
     }
@@ -119,6 +217,23 @@ private:
     HdrHorizontalRegionProcessor<CPP> bottomHdrProcessor;
     HdrVerticalRegionProcessor<CPP> leftHdrProcessor;
     HdrVerticalRegionProcessor<CPP> rightHdrProcessor;
+
+    struct ZoneEntry { LedRange range; bool reversed; };
+
+    std::vector<ZoneEntry> topZoneEntries;
+    std::vector<ZoneEntry> bottomZoneEntries;
+    std::vector<ZoneEntry> leftZoneEntries;
+    std::vector<ZoneEntry> rightZoneEntries;
+
+    std::vector<SdrHorizontalRegionProcessor<CPP>> topSdrZoneProcs;
+    std::vector<SdrHorizontalRegionProcessor<CPP>> bottomSdrZoneProcs;
+    std::vector<SdrVerticalRegionProcessor<CPP>>   leftSdrZoneProcs;
+    std::vector<SdrVerticalRegionProcessor<CPP>>   rightSdrZoneProcs;
+
+    std::vector<HdrHorizontalRegionProcessor<CPP>> topHdrZoneProcs;
+    std::vector<HdrHorizontalRegionProcessor<CPP>> bottomHdrZoneProcs;
+    std::vector<HdrVerticalRegionProcessor<CPP>>   leftHdrZoneProcs;
+    std::vector<HdrVerticalRegionProcessor<CPP>>   rightHdrZoneProcs;
 
     std::vector<RGBColor> colors;
 };

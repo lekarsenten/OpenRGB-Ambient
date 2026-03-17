@@ -17,6 +17,9 @@ QString Settings::TOP_SUFFIX = "_Top"; // NOLINT(cert-err58-cpp)
 QString Settings::BOTTOM_SUFFIX = "_Bottom"; // NOLINT(cert-err58-cpp)
 QString Settings::LEFT_SUFFIX = "_Left"; // NOLINT(cert-err58-cpp)
 QString Settings::RIGHT_SUFFIX = "_Right"; // NOLINT(cert-err58-cpp)
+QString Settings::ZONE_MAPPINGS_KEY   = "ZoneMappings"; // NOLINT(cert-err58-cpp)
+QString Settings::MONITOR_ADAPTER_KEY = "MonitorAdapter"; // NOLINT(cert-err58-cpp)
+QString Settings::MONITOR_OUTPUT_KEY  = "MonitorOutput"; // NOLINT(cert-err58-cpp)
 
 Settings::Settings(const QString &file, QObject *parent)
     : QObject{parent}
@@ -31,6 +34,8 @@ Settings::Settings(const QString &file, QObject *parent)
     fillRegions(leftRegions, settings.value(CONTROLLER_REGIONS_KEY + LEFT_SUFFIX).toHash());
     fillRegions(rightRegions, settings.value(CONTROLLER_REGIONS_KEY + RIGHT_SUFFIX).toHash());
 
+    fillZoneParts(zoneParts, settings.value(ZONE_MAPPINGS_KEY).toHash());
+
     coolWhiteCompensation = settings.value(COOL_WHITE_COMPENSATION_KEY, true).toBool();
     colorTemperatureIndex = std::clamp(
             settings.value(COLOR_TEMPERATURE_KEY, colorTemperatureIndex).toInt(),
@@ -40,6 +45,9 @@ Settings::Settings(const QString &file, QObject *parent)
 
     smoothing = settings.value(SMOOTHING_KEY, false).toBool();
     smoothingWeight = settings.value(SMOOTHING_WEIGHT_KEY, 0.5).toFloat();
+
+    monitorAdapterIndex = settings.value(MONITOR_ADAPTER_KEY, 0).toInt();
+    monitorOutputIndex  = settings.value(MONITOR_OUTPUT_KEY,  0).toInt();
 }
 
 bool Settings::isControllerSelected(const std::string &location) const {
@@ -120,6 +128,75 @@ void Settings::syncRegions(const RegionMap &map, const QString &key)
     settings.setValue(key, data);
 
     emit settingsChanged();
+}
+
+int Settings::monitorAdapter() const noexcept { return monitorAdapterIndex; }
+int Settings::monitorOutput()  const noexcept { return monitorOutputIndex; }
+
+void Settings::setMonitorAdapter(int index)
+{
+    monitorAdapterIndex = index;
+    settings.setValue(MONITOR_ADAPTER_KEY, monitorAdapterIndex);
+    emit settingsChanged();
+}
+
+void Settings::setMonitorOutput(int index)
+{
+    monitorOutputIndex = index;
+    settings.setValue(MONITOR_OUTPUT_KEY, monitorOutputIndex);
+    emit settingsChanged();
+}
+
+std::vector<ZonePart> Settings::getZoneParts(const std::string &location, const std::string &zoneName) const
+{
+    const auto key = location + "|" + zoneName;
+    const auto it = zoneParts.find(key);
+    return (it != std::end(zoneParts)) ? it->second : std::vector<ZonePart>{};
+}
+
+void Settings::setZoneParts(const std::string &location, const std::string &zoneName, std::vector<ZonePart> parts)
+{
+    zoneParts[location + "|" + zoneName] = std::move(parts);
+    syncZoneMappings();
+}
+
+void Settings::syncZoneMappings()
+{
+    QVariantHash data;
+    for (const auto &entry : zoneParts)
+    {
+        QVariantList partsList;
+        for (const auto &p : entry.second)
+            partsList.append(QVariant{QVariantList{p.from, p.to, static_cast<int>(p.region), p.reversed}});
+        data[QString::fromStdString(entry.first)] = partsList;
+    }
+
+    settings.setValue(ZONE_MAPPINGS_KEY, data);
+
+    emit settingsChanged();
+}
+
+void Settings::fillZoneParts(ZonePartsMap &map, const QVariantHash &data)
+{
+    QHashIterator i{data};
+    while (i.hasNext())
+    {
+        i.next();
+        std::vector<ZonePart> parts;
+        for (const auto &item : i.value().toList())
+        {
+            const auto entry = item.toList();
+            if (entry.size() < 4)
+                continue;
+            ZonePart p;
+            p.from     = entry[0].toInt();
+            p.to       = entry[1].toInt();
+            p.region   = static_cast<ScreenRegion>(entry[2].toInt());
+            p.reversed = entry[3].toBool();
+            parts.push_back(p);
+        }
+        map[i.key().toStdString()] = std::move(parts);
+    }
 }
 
 void Settings::fillRegions(RegionMap &map, const QVariantHash &data)

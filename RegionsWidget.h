@@ -9,6 +9,7 @@
 
 #include <QWidget>
 
+class QFormLayout;
 class ResourceManagerInterface;
 class RegionWidget;
 class Settings;
@@ -38,8 +39,12 @@ private:
     std::string currentLocation;
     bool preview = false;
 
+    QWidget     *zonesContainer = nullptr;
+    QFormLayout *zonesLayout    = nullptr;
+
     void showCurrentLeds(int from, int to);
     void clearCurrentLeds();
+    void rebuildZoneRows();
 };
 
 #endif //OPENRGB_AMBIENT_REGIONSWIDGET_H

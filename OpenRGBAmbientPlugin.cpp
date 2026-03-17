@@ -11,6 +11,7 @@
 
 #include "ColorConversion.h"
 #include "LedUpdateEvent.h"
+#include "ZoneMapping.h"
 #include "ReleaseWrapper.h"
 #include "ScreenCapture.h"
 #include "SettingsTab.h"
@@ -104,6 +105,7 @@ QWidget *OpenRGBAmbientPlugin::GetWidget()
 {
     const auto ui = new SettingsTab{resourceManager, *settings};
     connect(this, &OpenRGBAmbientPlugin::previewUpdated, ui, &SettingsTab::updatePreview);
+    connect(this, &OpenRGBAmbientPlugin::ledColorsUpdated, ui, &SettingsTab::updateLedColors);
     connect(ui, &SettingsTab::previewChanged, this, &OpenRGBAmbientPlugin::setPreview);
     connect(ui, &SettingsTab::settingsVisibilityChanged, this, &OpenRGBAmbientPlugin::setPauseCapture);
 
@@ -168,8 +170,10 @@ void OpenRGBAmbientPlugin::updateProcessors()
 
 void OpenRGBAmbientPlugin::startCapture()
 {
+    const auto adapterIdx = static_cast<UINT>(settings->monitorAdapter());
+    const auto outputIdx  = settings->monitorOutput();
     captureThread = std::thread([=] {
-        ScreenCapture capture;
+        ScreenCapture capture{adapterIdx, outputIdx};
         Limiter limiter{60};
 
         while (!stopFlag.load())
@@ -288,18 +292,36 @@ void OpenRGBAmbientPlugin::processUpdate(const LedUpdateEvent &event)
             (*controller)->SetLED(i, colors[i]);
 
         (*controller)->UpdateLEDs();
+
+        emit ledColorsUpdated(QString::fromStdString(location), colors);
     }
 }
 
 template<ColorPostProcessor CPP>
 std::unique_ptr<ImageProcessorBase> OpenRGBAmbientPlugin::createProcessor(RGBController *controller, std::array<float, 3> colorFactors, CPP colorPostProcessor)
 {
+    std::vector<ZoneLedRange> zoneMappings;
+    for (const auto &zone : controller->zones)
+    {
+        const auto parts = settings->getZoneParts(controller->location, zone.name);
+        for (const auto &part : parts)
+        {
+            if (part.region == ScreenRegion::None)
+                continue;
+            const auto absFrom = static_cast<int>(zone.start_idx) + part.from;
+            const auto absTo   = static_cast<int>(zone.start_idx) + part.to;
+            zoneMappings.push_back({{absFrom, absTo}, part.region, part.reversed});
+        }
+    }
+
     return std::make_unique<ImageProcessor<CPP>>(
             controller->location,
+            static_cast<int>(controller->leds.size()),
             settings->getTopRegion(controller->location),
             settings->getBottomRegion(controller->location),
             settings->getRightRegion(controller->location),
             settings->getLeftRegion(controller->location),
+            std::move(zoneMappings),
             colorFactors,
             colorPostProcessor,
             this
