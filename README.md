@@ -1,3 +1,22 @@
+**Fork with extended functionality for OpenRGB-Ambient plugin.**
+=======================================================
+
+1. Device zones toggles have been added. Now you can specify zones to be and not to be affected.
+   Useful if i.e. you'd like to have audio visualization on separate zone on the same device
+2. Added zone parts (Segments) to be mapped with possible reverse to the frame. Useful if you have ∩-shaped one-strip backlight.
+3. Adjusted preview to work in HDR mode and show led colors.
+
+<img width="856" height="658" alt="image" src="https://github.com/user-attachments/assets/819f6fc0-a45d-4f09-b262-fd5767dcfc45" />
+
+
+Be aware: 75% of AI slop by Claude has been used!
+
+
+Forked from and updated 
+https://github.com/krojew/OpenRGB-Ambient.
+Original readme is below ⬇️
+======================================================
+
 OpenRGB plugin inspired by NZXT HUE 2 Ambient Lighting, although it works with anything supported by OpenRGB.
 
 Note: this plugin in no way endorses NZXT or their products, especially given their [anti-consumer practices](https://www.youtube.com/watch?v=0pomC1CfpC0).
