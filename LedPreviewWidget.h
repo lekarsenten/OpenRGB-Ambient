@@ -28,7 +28,7 @@ public:
 
 public slots:
     void updateFrame(const QImage &image);
-    void updateLedColors(const QString &location, std::vector<RGBColor> colors);
+    void updateLedColors(const QString &location, const std::vector<RGBColor> &colors);
 
 protected:
     void paintEvent(QPaintEvent *event) override;

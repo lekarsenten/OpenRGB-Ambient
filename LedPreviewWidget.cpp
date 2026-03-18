@@ -31,9 +31,9 @@ void LedPreviewWidget::updateFrame(const QImage &image)
     update();
 }
 
-void LedPreviewWidget::updateLedColors(const QString &location, std::vector<RGBColor> colors)
+void LedPreviewWidget::updateLedColors(const QString &location, const std::vector<RGBColor> &colors)
 {
-    deviceColors[location.toStdString()] = std::move(colors);
+    deviceColors[location.toStdString()] = colors;
     update();
 }
 

@@ -57,7 +57,7 @@ public slots:
 
 signals:
     void previewUpdated(const QImage &image);
-    void ledColorsUpdated(const QString &location, std::vector<RGBColor> colors);
+    void ledColorsUpdated(const QString &location, const std::vector<RGBColor> &colors);
 
 private:
     static const TCHAR *END_SESSION_WND_CLASS;

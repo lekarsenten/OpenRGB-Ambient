@@ -27,7 +27,7 @@ public:
 
 public slots:
     void updatePreview(const QImage &image) const;
-    void updateLedColors(const QString &location, std::vector<RGBColor> colors) const;
+    void updateLedColors(const QString &location, const std::vector<RGBColor> &colors) const;
 
 signals:
     void controllerListChanged();

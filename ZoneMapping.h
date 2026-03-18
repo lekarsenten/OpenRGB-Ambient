@@ -28,9 +28,9 @@ struct ZonePart
 // range holds absolute device LED indices.
 struct ZoneLedRange
 {
-    LedRange     range;
-    ScreenRegion region;
-    bool         reversed;
+    LedRange     range    = {0, 0};
+    ScreenRegion region   = ScreenRegion::None;
+    bool         reversed = false;
 };
 
 #endif //OPENRGB_AMBIENT_ZONEMAPPING_H

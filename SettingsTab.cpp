@@ -126,9 +126,9 @@ void SettingsTab::updatePreview(const QImage &image) const
     preview->updateFrame(image);
 }
 
-void SettingsTab::updateLedColors(const QString &location, std::vector<RGBColor> colors) const
+void SettingsTab::updateLedColors(const QString &location, const std::vector<RGBColor> &colors) const
 {
-    preview->updateLedColors(location, std::move(colors));
+    preview->updateLedColors(location, colors);
 }
 
 

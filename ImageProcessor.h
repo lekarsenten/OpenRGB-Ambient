@@ -43,7 +43,7 @@ public:
                    LedRange bottomRange,
                    LedRange rightRange,
                    LedRange leftRange,
-                   std::vector<ZoneLedRange> zoneMappings,
+                   const std::vector<ZoneLedRange> &zoneMappings,
                    std::array<float, 3> colorFactors,
                    CPP colorPostProcessor,
                    QObject *eventReceiver)
