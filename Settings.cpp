@@ -18,7 +18,8 @@ QString Settings::BOTTOM_SUFFIX = "_Bottom"; // NOLINT(cert-err58-cpp)
 QString Settings::LEFT_SUFFIX = "_Left"; // NOLINT(cert-err58-cpp)
 QString Settings::RIGHT_SUFFIX = "_Right"; // NOLINT(cert-err58-cpp)
 QString Settings::ZONE_MAPPINGS_KEY   = "ZoneMappings"; // NOLINT(cert-err58-cpp)
-QString Settings::DISABLED_ZONES_KEY  = "DisabledZones"; // NOLINT(cert-err58-cpp)
+QString Settings::DISABLED_ZONES_KEY         = "DisabledZones";        // NOLINT(cert-err58-cpp)
+QString Settings::ZONE_MAPPING_LOCATIONS_KEY = "ZoneMappingLocations"; // NOLINT(cert-err58-cpp)
 QString Settings::MONITOR_ADAPTER_KEY = "MonitorAdapter"; // NOLINT(cert-err58-cpp)
 QString Settings::MONITOR_OUTPUT_KEY  = "MonitorOutput"; // NOLINT(cert-err58-cpp)
 
@@ -40,6 +41,10 @@ Settings::Settings(const QString &file, QObject *parent)
     const auto disabledList = settings.value(DISABLED_ZONES_KEY).toStringList();
     for (const auto &key : disabledList)
         disabledZones.insert(key.toStdString());
+
+    const auto zoneModeList = settings.value(ZONE_MAPPING_LOCATIONS_KEY).toStringList();
+    for (const auto &loc : zoneModeList)
+        zoneMappingLocations.insert(loc.toStdString());
 
     coolWhiteCompensation = settings.value(COOL_WHITE_COMPENSATION_KEY, true).toBool();
     colorTemperatureIndex = std::clamp(
@@ -72,6 +77,29 @@ void Settings::setZoneEnabled(const std::string &location, const std::string &zo
     else
         disabledZones.insert(key);
     syncDisabledZones();
+}
+
+MappingMode Settings::getMappingMode(const std::string &location) const
+{
+    return zoneMappingLocations.count(location) ? MappingMode::Zone : MappingMode::Standard;
+}
+
+void Settings::setMappingMode(const std::string &location, MappingMode mode)
+{
+    if (mode == MappingMode::Zone)
+        zoneMappingLocations.insert(location);
+    else
+        zoneMappingLocations.erase(location);
+    syncMappingModes();
+}
+
+void Settings::syncMappingModes()
+{
+    QStringList value;
+    for (const auto &loc : zoneMappingLocations)
+        value.append(QString::fromStdString(loc));
+    settings.setValue(ZONE_MAPPING_LOCATIONS_KEY, value);
+    emit settingsChanged();
 }
 
 void Settings::syncDisabledZones()

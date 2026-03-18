@@ -46,6 +46,7 @@ public:
                    const std::vector<ZoneLedRange> &zoneMappings,
                    std::array<float, 3> colorFactors,
                    CPP colorPostProcessor,
+                   bool useZoneMapping,
                    QObject *eventReceiver)
             : controllerLocation{std::move(controllerLocation)}
             , eventReceiver{eventReceiver}
@@ -62,6 +63,7 @@ public:
             , leftHdrProcessor{leftRange.getLength(), colorFactors, colorPostProcessor}
             , rightHdrProcessor{rightRange.getLength(), colorFactors, colorPostProcessor}
             , colors(totalLeds)
+            , useZoneMapping{useZoneMapping}
     {
         for (const auto &z : zoneMappings)
         {
@@ -104,42 +106,47 @@ public:
         const auto realRight = std::min(rightRange.from, rightRange.to);
         const auto realLeft = std::min(leftRange.from, leftRange.to);
 
-        topSdrProcessor.processRegion(colors.data() + realTop, data, width, sampleHeight, stridePixels);
-        bottomSdrProcessor.processRegion(colors.data() + realBottom, data + 4 * stridePixels * (height - sampleHeight), width, sampleHeight, stridePixels);
-        leftSdrProcessor.processRegion(colors.data() + realLeft, data, sampleWidth, height, 0, stridePixels);
-        rightSdrProcessor.processRegion(colors.data() + realRight, data, sampleWidth, height, width - sampleWidth, stridePixels);
-
-        for (auto i = 0u; i < topZoneEntries.size(); ++i)
+        if (!useZoneMapping)
         {
-            const auto start = std::min(topZoneEntries[i].range.from, topZoneEntries[i].range.to);
-            const auto len = topZoneEntries[i].range.getLength();
-            topSdrZoneProcs[i].processRegion(colors.data() + start, data, width, sampleHeight, stridePixels);
-            if (topZoneEntries[i].reversed)
-                std::reverse(colors.data() + start, colors.data() + start + len);
+            topSdrProcessor.processRegion(colors.data() + realTop, data, width, sampleHeight, stridePixels);
+            bottomSdrProcessor.processRegion(colors.data() + realBottom, data + 4 * stridePixels * (height - sampleHeight), width, sampleHeight, stridePixels);
+            leftSdrProcessor.processRegion(colors.data() + realLeft, data, sampleWidth, height, 0, stridePixels);
+            rightSdrProcessor.processRegion(colors.data() + realRight, data, sampleWidth, height, width - sampleWidth, stridePixels);
         }
-        for (auto i = 0u; i < bottomZoneEntries.size(); ++i)
+        else
         {
-            const auto start = std::min(bottomZoneEntries[i].range.from, bottomZoneEntries[i].range.to);
-            const auto len = bottomZoneEntries[i].range.getLength();
-            bottomSdrZoneProcs[i].processRegion(colors.data() + start, data + 4 * stridePixels * (height - sampleHeight), width, sampleHeight, stridePixels);
-            if (bottomZoneEntries[i].reversed)
-                std::reverse(colors.data() + start, colors.data() + start + len);
-        }
-        for (auto i = 0u; i < leftZoneEntries.size(); ++i)
-        {
-            const auto start = std::min(leftZoneEntries[i].range.from, leftZoneEntries[i].range.to);
-            const auto len = leftZoneEntries[i].range.getLength();
-            leftSdrZoneProcs[i].processRegion(colors.data() + start, data, sampleWidth, height, 0, stridePixels);
-            if (leftZoneEntries[i].reversed)
-                std::reverse(colors.data() + start, colors.data() + start + len);
-        }
-        for (auto i = 0u; i < rightZoneEntries.size(); ++i)
-        {
-            const auto start = std::min(rightZoneEntries[i].range.from, rightZoneEntries[i].range.to);
-            const auto len = rightZoneEntries[i].range.getLength();
-            rightSdrZoneProcs[i].processRegion(colors.data() + start, data, sampleWidth, height, width - sampleWidth, stridePixels);
-            if (rightZoneEntries[i].reversed)
-                std::reverse(colors.data() + start, colors.data() + start + len);
+            for (auto i = 0u; i < topZoneEntries.size(); ++i)
+            {
+                const auto start = std::min(topZoneEntries[i].range.from, topZoneEntries[i].range.to);
+                const auto len = topZoneEntries[i].range.getLength();
+                topSdrZoneProcs[i].processRegion(colors.data() + start, data, width, sampleHeight, stridePixels);
+                if (topZoneEntries[i].reversed)
+                    std::reverse(colors.data() + start, colors.data() + start + len);
+            }
+            for (auto i = 0u; i < bottomZoneEntries.size(); ++i)
+            {
+                const auto start = std::min(bottomZoneEntries[i].range.from, bottomZoneEntries[i].range.to);
+                const auto len = bottomZoneEntries[i].range.getLength();
+                bottomSdrZoneProcs[i].processRegion(colors.data() + start, data + 4 * stridePixels * (height - sampleHeight), width, sampleHeight, stridePixels);
+                if (bottomZoneEntries[i].reversed)
+                    std::reverse(colors.data() + start, colors.data() + start + len);
+            }
+            for (auto i = 0u; i < leftZoneEntries.size(); ++i)
+            {
+                const auto start = std::min(leftZoneEntries[i].range.from, leftZoneEntries[i].range.to);
+                const auto len = leftZoneEntries[i].range.getLength();
+                leftSdrZoneProcs[i].processRegion(colors.data() + start, data, sampleWidth, height, 0, stridePixels);
+                if (leftZoneEntries[i].reversed)
+                    std::reverse(colors.data() + start, colors.data() + start + len);
+            }
+            for (auto i = 0u; i < rightZoneEntries.size(); ++i)
+            {
+                const auto start = std::min(rightZoneEntries[i].range.from, rightZoneEntries[i].range.to);
+                const auto len = rightZoneEntries[i].range.getLength();
+                rightSdrZoneProcs[i].processRegion(colors.data() + start, data, sampleWidth, height, width - sampleWidth, stridePixels);
+                if (rightZoneEntries[i].reversed)
+                    std::reverse(colors.data() + start, colors.data() + start + len);
+            }
         }
 
         QCoreApplication::postEvent(eventReceiver, new LedUpdateEvent{controllerLocation, colors});
@@ -155,42 +162,47 @@ public:
         const auto realRight = std::min(rightRange.from, rightRange.to);
         const auto realLeft = std::min(leftRange.from, leftRange.to);
 
-        topHdrProcessor.processRegion(colors.data() + realTop, data, width, sampleHeight, stridePixels);
-        bottomHdrProcessor.processRegion(colors.data() + realBottom, data + stridePixels * (height - sampleHeight), width, sampleHeight, stridePixels);
-        leftHdrProcessor.processRegion(colors.data() + realLeft, data, sampleWidth, height, 0, stridePixels);
-        rightHdrProcessor.processRegion(colors.data() + realRight, data, sampleWidth, height, width - sampleWidth, stridePixels);
-
-        for (auto i = 0u; i < topZoneEntries.size(); ++i)
+        if (!useZoneMapping)
         {
-            const auto start = std::min(topZoneEntries[i].range.from, topZoneEntries[i].range.to);
-            const auto len = topZoneEntries[i].range.getLength();
-            topHdrZoneProcs[i].processRegion(colors.data() + start, data, width, sampleHeight, stridePixels);
-            if (topZoneEntries[i].reversed)
-                std::reverse(colors.data() + start, colors.data() + start + len);
+            topHdrProcessor.processRegion(colors.data() + realTop, data, width, sampleHeight, stridePixels);
+            bottomHdrProcessor.processRegion(colors.data() + realBottom, data + stridePixels * (height - sampleHeight), width, sampleHeight, stridePixels);
+            leftHdrProcessor.processRegion(colors.data() + realLeft, data, sampleWidth, height, 0, stridePixels);
+            rightHdrProcessor.processRegion(colors.data() + realRight, data, sampleWidth, height, width - sampleWidth, stridePixels);
         }
-        for (auto i = 0u; i < bottomZoneEntries.size(); ++i)
+        else
         {
-            const auto start = std::min(bottomZoneEntries[i].range.from, bottomZoneEntries[i].range.to);
-            const auto len = bottomZoneEntries[i].range.getLength();
-            bottomHdrZoneProcs[i].processRegion(colors.data() + start, data + stridePixels * (height - sampleHeight), width, sampleHeight, stridePixels);
-            if (bottomZoneEntries[i].reversed)
-                std::reverse(colors.data() + start, colors.data() + start + len);
-        }
-        for (auto i = 0u; i < leftZoneEntries.size(); ++i)
-        {
-            const auto start = std::min(leftZoneEntries[i].range.from, leftZoneEntries[i].range.to);
-            const auto len = leftZoneEntries[i].range.getLength();
-            leftHdrZoneProcs[i].processRegion(colors.data() + start, data, sampleWidth, height, 0, stridePixels);
-            if (leftZoneEntries[i].reversed)
-                std::reverse(colors.data() + start, colors.data() + start + len);
-        }
-        for (auto i = 0u; i < rightZoneEntries.size(); ++i)
-        {
-            const auto start = std::min(rightZoneEntries[i].range.from, rightZoneEntries[i].range.to);
-            const auto len = rightZoneEntries[i].range.getLength();
-            rightHdrZoneProcs[i].processRegion(colors.data() + start, data, sampleWidth, height, width - sampleWidth, stridePixels);
-            if (rightZoneEntries[i].reversed)
-                std::reverse(colors.data() + start, colors.data() + start + len);
+            for (auto i = 0u; i < topZoneEntries.size(); ++i)
+            {
+                const auto start = std::min(topZoneEntries[i].range.from, topZoneEntries[i].range.to);
+                const auto len = topZoneEntries[i].range.getLength();
+                topHdrZoneProcs[i].processRegion(colors.data() + start, data, width, sampleHeight, stridePixels);
+                if (topZoneEntries[i].reversed)
+                    std::reverse(colors.data() + start, colors.data() + start + len);
+            }
+            for (auto i = 0u; i < bottomZoneEntries.size(); ++i)
+            {
+                const auto start = std::min(bottomZoneEntries[i].range.from, bottomZoneEntries[i].range.to);
+                const auto len = bottomZoneEntries[i].range.getLength();
+                bottomHdrZoneProcs[i].processRegion(colors.data() + start, data + stridePixels * (height - sampleHeight), width, sampleHeight, stridePixels);
+                if (bottomZoneEntries[i].reversed)
+                    std::reverse(colors.data() + start, colors.data() + start + len);
+            }
+            for (auto i = 0u; i < leftZoneEntries.size(); ++i)
+            {
+                const auto start = std::min(leftZoneEntries[i].range.from, leftZoneEntries[i].range.to);
+                const auto len = leftZoneEntries[i].range.getLength();
+                leftHdrZoneProcs[i].processRegion(colors.data() + start, data, sampleWidth, height, 0, stridePixels);
+                if (leftZoneEntries[i].reversed)
+                    std::reverse(colors.data() + start, colors.data() + start + len);
+            }
+            for (auto i = 0u; i < rightZoneEntries.size(); ++i)
+            {
+                const auto start = std::min(rightZoneEntries[i].range.from, rightZoneEntries[i].range.to);
+                const auto len = rightZoneEntries[i].range.getLength();
+                rightHdrZoneProcs[i].processRegion(colors.data() + start, data, sampleWidth, height, width - sampleWidth, stridePixels);
+                if (rightZoneEntries[i].reversed)
+                    std::reverse(colors.data() + start, colors.data() + start + len);
+            }
         }
 
         QCoreApplication::postEvent(eventReceiver, new LedUpdateEvent{controllerLocation, colors});
@@ -202,6 +214,7 @@ private:
 
     std::string controllerLocation;
     QObject *eventReceiver;
+    bool useZoneMapping = false;
 
     LedRange topRange;
     LedRange bottomRange;

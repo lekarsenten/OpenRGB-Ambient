@@ -14,6 +14,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QTimer>
 
 #include <OpenRGBPluginInterface.h>
 #include <RGBController.h>
@@ -68,6 +69,8 @@ private:
     std::atomic_bool stopFlag{false};
     std::atomic_bool preview{false};
     std::atomic_bool pauseCapture{false};
+
+    QTimer *debounceTimer = nullptr;
 
     std::vector<std::unique_ptr<ImageProcessorBase>> processors;
 

@@ -8,8 +8,8 @@
 #include <QWidget>
 
 class ResourceManagerInterface;
-class QTreeWidgetItem;
-class QTreeWidget;
+class QListWidgetItem;
+class QListWidget;
 class Settings;
 
 class DeviceList
@@ -28,12 +28,12 @@ public slots:
     void fillControllerList() const;
 
 private slots:
-    void onItemChanged(QTreeWidgetItem *item, int column) const;
+    void onItemChanged(QListWidgetItem *item) const;
 
 private:
     ResourceManagerInterface *resourceManager;
     Settings &settings;
-    QTreeWidget *deviceList;
+    QListWidget *deviceList;
 };
 
 #endif //OPENRGB_AMBIENT_DEVICELIST_H

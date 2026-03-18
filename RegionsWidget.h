@@ -10,6 +10,7 @@
 #include <QWidget>
 
 class QFormLayout;
+class QRadioButton;
 class ResourceManagerInterface;
 class RegionWidget;
 class Settings;
@@ -39,8 +40,12 @@ private:
     std::string currentLocation;
     bool preview = false;
 
-    QWidget     *zonesContainer = nullptr;
-    QFormLayout *zonesLayout    = nullptr;
+    QRadioButton *standardRadio     = nullptr;
+    QRadioButton *zoneRadio         = nullptr;
+    QWidget     *standardContainer = nullptr;
+    QWidget     *zoneContainer     = nullptr;
+    QWidget     *zonesContainer    = nullptr;
+    QFormLayout *zonesLayout       = nullptr;
 
     void showCurrentLeds(int from, int to);
     void clearCurrentLeds();

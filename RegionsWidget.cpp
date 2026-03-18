@@ -9,6 +9,8 @@
 #include <QComboBox>
 #include <QCheckBox>
 #include <QHBoxLayout>
+#include <QVBoxLayout>
+#include <QRadioButton>
 #include <QSpinBox>
 #include <QPushButton>
 
@@ -27,7 +29,22 @@ RegionsWidget::RegionsWidget(ResourceManagerInterface *resourceManager, Settings
     , resourceManager{resourceManager}
     , settings{settings}
 {
-    const auto layout = new QFormLayout{this};
+    const auto mainLayout = new QVBoxLayout{this};
+    mainLayout->setContentsMargins(0, 0, 0, 0);
+
+    // Mapping mode selector
+    const auto radioLayout = new QHBoxLayout{};
+    standardRadio = new QRadioButton{"Standard mapping"};
+    zoneRadio     = new QRadioButton{"Zone mapping"};
+    standardRadio->setChecked(true);
+    radioLayout->addWidget(standardRadio);
+    radioLayout->addWidget(zoneRadio);
+    radioLayout->addStretch();
+    mainLayout->addLayout(radioLayout);
+
+    // Standard mapping container
+    standardContainer = new QWidget{};
+    const auto standardLayout = new QFormLayout{standardContainer};
 
     top = new RegionWidget{};
     connect(top, &RegionWidget::regionChanged, this, [=](auto from, auto to) {
@@ -42,8 +59,7 @@ RegionsWidget::RegionsWidget(ResourceManagerInterface *resourceManager, Settings
         if (!preview)
             clearCurrentLeds();
     });
-
-    layout->addRow("Top", top);
+    standardLayout->addRow("Top", top);
 
     bottom = new RegionWidget{};
     connect(bottom, &RegionWidget::regionChanged, this, [=](auto from, auto to) {
@@ -58,8 +74,7 @@ RegionsWidget::RegionsWidget(ResourceManagerInterface *resourceManager, Settings
         if (!preview)
             clearCurrentLeds();
     });
-
-    layout->addRow("Bottom", bottom);
+    standardLayout->addRow("Bottom", bottom);
 
     right = new RegionWidget{};
     connect(right, &RegionWidget::regionChanged, this, [=](auto from, auto to) {
@@ -74,8 +89,7 @@ RegionsWidget::RegionsWidget(ResourceManagerInterface *resourceManager, Settings
         if (!preview)
             clearCurrentLeds();
     });
-
-    layout->addRow("Right", right);
+    standardLayout->addRow("Right", right);
 
     left = new RegionWidget{};
     connect(left, &RegionWidget::regionChanged, this, [=](auto from, auto to) {
@@ -90,15 +104,30 @@ RegionsWidget::RegionsWidget(ResourceManagerInterface *resourceManager, Settings
         if (!preview)
             clearCurrentLeds();
     });
+    standardLayout->addRow("Left", left);
 
-    layout->addRow("Left", left);
+    mainLayout->addWidget(standardContainer);
 
-    layout->addRow(new QLabel{"<b>Zone mapping</b>"});
+    // Zone mapping container
+    zoneContainer = new QWidget{};
+    const auto zoneLayout = new QVBoxLayout{zoneContainer};
+    zoneLayout->setContentsMargins(0, 0, 0, 0);
 
     zonesContainer = new QWidget{};
     zonesLayout = new QFormLayout{zonesContainer};
     zonesLayout->setContentsMargins(0, 0, 0, 0);
-    layout->addRow(zonesContainer);
+    zoneLayout->addWidget(zonesContainer);
+
+    zoneContainer->setVisible(false);
+    mainLayout->addWidget(zoneContainer);
+
+    // Toggle visibility and persist mode on radio button change
+    connect(standardRadio, &QRadioButton::toggled, this, [this](bool checked) {
+        standardContainer->setVisible(checked);
+        zoneContainer->setVisible(!checked);
+        if (!currentLocation.empty())
+            this->settings.setMappingMode(currentLocation, checked ? MappingMode::Standard : MappingMode::Zone);
+    });
 }
 
 void RegionsWidget::selectController(const QString &location)
@@ -109,6 +138,17 @@ void RegionsWidget::selectController(const QString &location)
     const auto controller = std::find_if(std::begin(controllers), std::end(controllers), [&](auto controller) {
         return controller->location == currentLocation;
     });
+
+    // Restore mapping mode for this controller without triggering a settings write
+    {
+        const QSignalBlocker b1{standardRadio};
+        const QSignalBlocker b2{zoneRadio};
+        const bool isZone = settings.getMappingMode(currentLocation) == MappingMode::Zone;
+        zoneRadio->setChecked(isZone);
+        standardRadio->setChecked(!isZone);
+        standardContainer->setVisible(!isZone);
+        zoneContainer->setVisible(isZone);
+    }
 
     if (controller == std::end(controllers))
     {
@@ -212,10 +252,21 @@ void RegionsWidget::rebuildZoneRows()
         const auto segsCopy  = zone.segments;
 
         // --- Zone header row ---
+        const auto zoneEnabled = settings.isZoneEnabled(loc, zoneName);
+
         const auto headerWidget = new QWidget{};
         const auto headerLayout = new QHBoxLayout{headerWidget};
         headerLayout->setContentsMargins(0, 0, 0, 0);
-        headerLayout->addWidget(new QLabel{QString("<b>%1</b>").arg(QString::fromStdString(zoneName))});
+
+        const auto enabledCheck = new QCheckBox{};
+        enabledCheck->setChecked(zoneEnabled);
+        headerLayout->addWidget(enabledCheck);
+
+        // Controls after the checkbox — greyed out when zone is disabled
+        const auto zoneControlsWidget = new QWidget{};
+        const auto zoneControlsLayout = new QHBoxLayout{zoneControlsWidget};
+        zoneControlsLayout->setContentsMargins(0, 0, 0, 0);
+        zoneControlsLayout->addWidget(new QLabel{QString("<b>%1</b>").arg(QString::fromStdString(zoneName))});
 
         if (!segsCopy.empty())
         {
@@ -229,7 +280,7 @@ void RegionsWidget::rebuildZoneRows()
                 this->settings.setZoneParts(loc, zoneName, parts);
                 QMetaObject::invokeMethod(this, &RegionsWidget::rebuildZoneRows, Qt::QueuedConnection);
             });
-            headerLayout->addWidget(loadBtn);
+            zoneControlsLayout->addWidget(loadBtn);
         }
 
         const auto addBtn = new QPushButton{"+"};
@@ -240,10 +291,25 @@ void RegionsWidget::rebuildZoneRows()
             this->settings.setZoneParts(loc, zoneName, parts);
             QMetaObject::invokeMethod(this, &RegionsWidget::rebuildZoneRows, Qt::QueuedConnection);
         });
-        headerLayout->addWidget(addBtn);
-        headerLayout->addStretch();
+        zoneControlsLayout->addWidget(addBtn);
+        zoneControlsLayout->addStretch();
+
+        zoneControlsWidget->setEnabled(zoneEnabled);
+        headerLayout->addWidget(zoneControlsWidget);
 
         zonesLayout->addRow(headerWidget);
+
+        // --- Part rows container — greyed out when zone is disabled ---
+        const auto partsContainer = new QWidget{};
+        const auto partsLayout    = new QVBoxLayout{partsContainer};
+        partsLayout->setContentsMargins(0, 0, 0, 0);
+        partsContainer->setEnabled(zoneEnabled);
+
+        connect(enabledCheck, &QCheckBox::toggled, this, [=](bool checked) {
+            this->settings.setZoneEnabled(loc, zoneName, checked);
+            zoneControlsWidget->setEnabled(checked);
+            partsContainer->setEnabled(checked);
+        });
 
         // --- One row per part ---
         const auto parts = settings.getZoneParts(loc, zoneName);
@@ -266,7 +332,7 @@ void RegionsWidget::rebuildZoneRows()
                 regionCombo->addItem(regionNames[i], i);
             regionCombo->setCurrentIndex(static_cast<int>(part.region));
 
-            const auto reversedCheck = new QCheckBox{"Rev"};
+            const auto reversedCheck = new QCheckBox{"Reverse"};
             reversedCheck->setChecked(part.reversed);
             reversedCheck->setEnabled(part.region != ScreenRegion::None);
 
@@ -312,7 +378,9 @@ void RegionsWidget::rebuildZoneRows()
             partLayout->addWidget(reversedCheck);
             partLayout->addWidget(removeBtn);
 
-            zonesLayout->addRow(partWidget);
+            partsLayout->addWidget(partWidget);
         }
+
+        zonesLayout->addRow(partsContainer);
     }
 }

@@ -52,32 +52,64 @@ std::vector<QColor> LedPreviewWidget::collectRegionColors(ScreenRegion region) c
 
         const auto &colors = it->second;
 
-        for (const auto &zone : controller->zones)
+        if (settings.getMappingMode(controller->location) == MappingMode::Standard)
         {
-            const auto parts = settings.getZoneParts(controller->location, zone.name);
-            for (const auto &part : parts)
+            LedRange range;
+            switch (region)
             {
-                if (part.region != region)
+                case ScreenRegion::Top:    range = settings.getTopRegion(controller->location);    break;
+                case ScreenRegion::Bottom: range = settings.getBottomRegion(controller->location); break;
+                case ScreenRegion::Left:   range = settings.getLeftRegion(controller->location);   break;
+                case ScreenRegion::Right:  range = settings.getRightRegion(controller->location);  break;
+                default: continue;
+            }
+
+            const int lo = std::min(range.from, range.to);
+            const int hi = std::max(range.from, range.to);
+            const int segStart = static_cast<int>(result.size());
+            for (int i = lo; i < hi && i < static_cast<int>(colors.size()); ++i)
+            {
+                const RGBColor c = colors[i];
+                result.emplace_back(
+                    static_cast<int>(c & 0xFF),
+                    static_cast<int>((c >> 8) & 0xFF),
+                    static_cast<int>((c >> 16) & 0xFF)
+                );
+            }
+            if (range.from > range.to)
+                std::reverse(result.begin() + segStart, result.end());
+        }
+        else
+        {
+            for (const auto &zone : controller->zones)
+            {
+                if (!settings.isZoneEnabled(controller->location, zone.name))
                     continue;
 
-                const int absFrom = static_cast<int>(zone.start_idx) + part.from;
-                const int absTo   = static_cast<int>(zone.start_idx) + part.to;
-
-                const int segStart = static_cast<int>(result.size());
-                for (int i = absFrom; i < absTo && i < static_cast<int>(colors.size()); ++i)
+                const auto parts = settings.getZoneParts(controller->location, zone.name);
+                for (const auto &part : parts)
                 {
-                    const RGBColor c = colors[i];
-                    result.emplace_back(
-                        static_cast<int>(c & 0xFF),
-                        static_cast<int>((c >> 8) & 0xFF),
-                        static_cast<int>((c >> 16) & 0xFF)
-                    );
+                    if (part.region != region)
+                        continue;
+
+                    const int absFrom = static_cast<int>(zone.start_idx) + part.from;
+                    const int absTo   = static_cast<int>(zone.start_idx) + part.to;
+                    const int lo      = std::min(absFrom, absTo);
+                    const int hi      = std::max(absFrom, absTo);
+
+                    const int segStart = static_cast<int>(result.size());
+                    for (int i = lo; i < hi && i < static_cast<int>(colors.size()); ++i)
+                    {
+                        const RGBColor c = colors[i];
+                        result.emplace_back(
+                            static_cast<int>(c & 0xFF),
+                            static_cast<int>((c >> 8) & 0xFF),
+                            static_cast<int>((c >> 16) & 0xFF)
+                        );
+                    }
+                    if (!part.reversed)
+                        std::reverse(result.begin() + segStart, result.end());
                 }
-                // Processor stores result[0] = bottom/right of screen by default.
-                // reversed=true means std::reverse was applied → result[0] = top/left → correct draw order.
-                // reversed=false → result[0] = bottom/right → must reverse for screen-coordinate display.
-                if (!part.reversed)
-                    std::reverse(result.begin() + segStart, result.end());
             }
         }
     }

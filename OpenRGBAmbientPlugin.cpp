@@ -77,7 +77,11 @@ void OpenRGBAmbientPlugin::Load(ResourceManagerInterface *resource_manager_ptr)
     resourceManager = resource_manager_ptr;
 
     settings = new Settings{QString::fromStdString((resourceManager->GetConfigurationDirectory() / "OpenRGBAmbientPlugin.ini").string()), this};
-    connect(settings, &Settings::settingsChanged, this, &OpenRGBAmbientPlugin::updateProcessors);
+    debounceTimer = new QTimer{this};
+    debounceTimer->setSingleShot(true);
+    debounceTimer->setInterval(150);
+    connect(debounceTimer, &QTimer::timeout, this, &OpenRGBAmbientPlugin::updateProcessors);
+    connect(settings, &Settings::settingsChanged, debounceTimer, qOverload<>(&QTimer::start));
 
     connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, this, &OpenRGBAmbientPlugin::turnOffLeds, Qt::DirectConnection);
 
@@ -315,20 +319,38 @@ void OpenRGBAmbientPlugin::processUpdate(const LedUpdateEvent &event)
     {
         const auto &colors = event.getColors();
 
-        for (const auto &zone : (*controller)->zones)
+        if (settings->getMappingMode(location) == MappingMode::Standard)
         {
-            if (!settings->isZoneEnabled(location, zone.name))
-                continue;
-
-            for (const auto &part : settings->getZoneParts(location, zone.name))
+            auto writeRange = [&](const LedRange &range) {
+                const int lo = std::min(range.from, range.to);
+                const int hi = std::max(range.from, range.to);
+                for (int i = lo; i < hi && i < static_cast<int>(colors.size()); ++i)
+                    (*controller)->SetLED(i, colors[i]);
+            };
+            writeRange(settings->getTopRegion(location));
+            writeRange(settings->getBottomRegion(location));
+            writeRange(settings->getLeftRegion(location));
+            writeRange(settings->getRightRegion(location));
+        }
+        else
+        {
+            for (const auto &zone : (*controller)->zones)
             {
-                if (part.region == ScreenRegion::None)
+                if (!settings->isZoneEnabled(location, zone.name))
                     continue;
 
-                const int absFrom = static_cast<int>(zone.start_idx) + part.from;
-                const int absTo   = static_cast<int>(zone.start_idx) + part.to;
-                for (int i = absFrom; i < absTo && i < static_cast<int>(colors.size()); ++i)
-                    (*controller)->SetLED(i, colors[i]);
+                for (const auto &part : settings->getZoneParts(location, zone.name))
+                {
+                    if (part.region == ScreenRegion::None)
+                        continue;
+
+                    const int absFrom = static_cast<int>(zone.start_idx) + part.from;
+                    const int absTo   = static_cast<int>(zone.start_idx) + part.to;
+                    const int lo      = std::min(absFrom, absTo);
+                    const int hi      = std::max(absFrom, absTo);
+                    for (int i = lo; i < hi && i < static_cast<int>(colors.size()); ++i)
+                        (*controller)->SetLED(i, colors[i]);
+                }
             }
         }
 
@@ -368,6 +390,7 @@ std::unique_ptr<ImageProcessorBase> OpenRGBAmbientPlugin::createProcessor(RGBCon
             std::move(zoneMappings),
             colorFactors,
             colorPostProcessor,
+            settings->getMappingMode(controller->location) == MappingMode::Zone,
             this
     );
 }

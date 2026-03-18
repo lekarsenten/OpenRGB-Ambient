@@ -19,6 +19,8 @@
 class ResourceManager;
 class QString;
 
+enum class MappingMode { Standard, Zone };
+
 class Settings final
         : public QObject
 {
@@ -33,6 +35,9 @@ public:
 
     [[nodiscard]] bool isZoneEnabled(const std::string &location, const std::string &zoneName) const;
     void setZoneEnabled(const std::string &location, const std::string &zoneName, bool enabled);
+
+    [[nodiscard]] MappingMode getMappingMode(const std::string &location) const;
+    void setMappingMode(const std::string &location, MappingMode mode);
 
     [[nodiscard]] LedRange getTopRegion(const std::string &location) const;
     [[nodiscard]] LedRange getBottomRegion(const std::string &location) const;
@@ -82,6 +87,7 @@ private:
 
     static QString ZONE_MAPPINGS_KEY;
     static QString DISABLED_ZONES_KEY;
+    static QString ZONE_MAPPING_LOCATIONS_KEY;
     static QString MONITOR_ADAPTER_KEY;
     static QString MONITOR_OUTPUT_KEY;
 
@@ -91,7 +97,8 @@ private:
     QSettings settings;
 
     std::unordered_set<std::string> selectedControllers;
-    std::unordered_set<std::string> disabledZones; // key: "location|zoneName"
+    std::unordered_set<std::string> disabledZones;         // key: "location|zoneName"
+    std::unordered_set<std::string> zoneMappingLocations;  // locations using zone mapping mode
 
     RegionMap topRegions;
     RegionMap bottomRegions;
@@ -112,6 +119,7 @@ private:
 
     void syncSelectedControllers();
     void syncDisabledZones();
+    void syncMappingModes();
     void syncRegions(const RegionMap &map, const QString &key);
     void syncZoneMappings();
 
