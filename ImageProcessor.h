@@ -73,22 +73,18 @@ public:
                 case ScreenRegion::Top:
                     topZoneEntries.push_back({z.range, z.reversed});
                     topSdrZoneProcs.emplace_back(len, colorFactors, colorPostProcessor);
-                    topHdrZoneProcs.emplace_back(len, colorFactors, colorPostProcessor);
                     break;
                 case ScreenRegion::Bottom:
                     bottomZoneEntries.push_back({z.range, z.reversed});
                     bottomSdrZoneProcs.emplace_back(len, colorFactors, colorPostProcessor);
-                    bottomHdrZoneProcs.emplace_back(len, colorFactors, colorPostProcessor);
                     break;
                 case ScreenRegion::Left:
                     leftZoneEntries.push_back({z.range, z.reversed});
                     leftSdrZoneProcs.emplace_back(len, colorFactors, colorPostProcessor);
-                    leftHdrZoneProcs.emplace_back(len, colorFactors, colorPostProcessor);
                     break;
                 case ScreenRegion::Right:
                     rightZoneEntries.push_back({z.range, z.reversed});
                     rightSdrZoneProcs.emplace_back(len, colorFactors, colorPostProcessor);
-                    rightHdrZoneProcs.emplace_back(len, colorFactors, colorPostProcessor);
                     break;
                 default:
                     break;
@@ -171,37 +167,95 @@ public:
         }
         else
         {
-            for (auto i = 0u; i < topZoneEntries.size(); ++i)
+            if (!topZoneEntries.empty())
             {
-                const auto start = std::min(topZoneEntries[i].range.from, topZoneEntries[i].range.to);
-                const auto len = topZoneEntries[i].range.getLength();
-                topHdrZoneProcs[i].processRegion(colors.data() + start, data, width, sampleHeight, stridePixels);
-                if (topZoneEntries[i].reversed)
-                    std::reverse(colors.data() + start, colors.data() + start + len);
+                hdrTopCache.resize(static_cast<size_t>(4 * width * sampleHeight));
+                for (int y = 0; y < sampleHeight; ++y)
+                    for (int x = 0; x < width; ++x)
+                    {
+                        const auto p = data[y * stridePixels + x];
+                        const auto idx = 4 * (y * width + x);
+                        hdrTopCache[idx]     = static_cast<uchar>(((p >> 20) & 0x3ffu) >> 2);
+                        hdrTopCache[idx + 1] = static_cast<uchar>(((p >> 10) & 0x3ffu) >> 2);
+                        hdrTopCache[idx + 2] = static_cast<uchar>((p & 0x3ffu) >> 2);
+                        hdrTopCache[idx + 3] = 0;
+                    }
+                for (auto i = 0u; i < topZoneEntries.size(); ++i)
+                {
+                    const auto start = std::min(topZoneEntries[i].range.from, topZoneEntries[i].range.to);
+                    const auto len = topZoneEntries[i].range.getLength();
+                    topSdrZoneProcs[i].processRegion(colors.data() + start, hdrTopCache.data(), width, sampleHeight, width);
+                    if (topZoneEntries[i].reversed)
+                        std::reverse(colors.data() + start, colors.data() + start + len);
+                }
             }
-            for (auto i = 0u; i < bottomZoneEntries.size(); ++i)
+            if (!bottomZoneEntries.empty())
             {
-                const auto start = std::min(bottomZoneEntries[i].range.from, bottomZoneEntries[i].range.to);
-                const auto len = bottomZoneEntries[i].range.getLength();
-                bottomHdrZoneProcs[i].processRegion(colors.data() + start, data + stridePixels * (height - sampleHeight), width, sampleHeight, stridePixels);
-                if (bottomZoneEntries[i].reversed)
-                    std::reverse(colors.data() + start, colors.data() + start + len);
+                hdrBottomCache.resize(static_cast<size_t>(4 * width * sampleHeight));
+                const auto bottomStartRow = height - sampleHeight;
+                for (int y = 0; y < sampleHeight; ++y)
+                    for (int x = 0; x < width; ++x)
+                    {
+                        const auto p = data[(bottomStartRow + y) * stridePixels + x];
+                        const auto idx = 4 * (y * width + x);
+                        hdrBottomCache[idx]     = static_cast<uchar>(((p >> 20) & 0x3ffu) >> 2);
+                        hdrBottomCache[idx + 1] = static_cast<uchar>(((p >> 10) & 0x3ffu) >> 2);
+                        hdrBottomCache[idx + 2] = static_cast<uchar>((p & 0x3ffu) >> 2);
+                        hdrBottomCache[idx + 3] = 0;
+                    }
+                for (auto i = 0u; i < bottomZoneEntries.size(); ++i)
+                {
+                    const auto start = std::min(bottomZoneEntries[i].range.from, bottomZoneEntries[i].range.to);
+                    const auto len = bottomZoneEntries[i].range.getLength();
+                    bottomSdrZoneProcs[i].processRegion(colors.data() + start, hdrBottomCache.data(), width, sampleHeight, width);
+                    if (bottomZoneEntries[i].reversed)
+                        std::reverse(colors.data() + start, colors.data() + start + len);
+                }
             }
-            for (auto i = 0u; i < leftZoneEntries.size(); ++i)
+            if (!leftZoneEntries.empty())
             {
-                const auto start = std::min(leftZoneEntries[i].range.from, leftZoneEntries[i].range.to);
-                const auto len = leftZoneEntries[i].range.getLength();
-                leftHdrZoneProcs[i].processRegion(colors.data() + start, data, sampleWidth, height, 0, stridePixels);
-                if (leftZoneEntries[i].reversed)
-                    std::reverse(colors.data() + start, colors.data() + start + len);
+                hdrLeftCache.resize(static_cast<size_t>(4 * sampleWidth * height));
+                for (int y = 0; y < height; ++y)
+                    for (int x = 0; x < sampleWidth; ++x)
+                    {
+                        const auto p = data[y * stridePixels + x];
+                        const auto idx = 4 * (y * sampleWidth + x);
+                        hdrLeftCache[idx]     = static_cast<uchar>(((p >> 20) & 0x3ffu) >> 2);
+                        hdrLeftCache[idx + 1] = static_cast<uchar>(((p >> 10) & 0x3ffu) >> 2);
+                        hdrLeftCache[idx + 2] = static_cast<uchar>((p & 0x3ffu) >> 2);
+                        hdrLeftCache[idx + 3] = 0;
+                    }
+                for (auto i = 0u; i < leftZoneEntries.size(); ++i)
+                {
+                    const auto start = std::min(leftZoneEntries[i].range.from, leftZoneEntries[i].range.to);
+                    const auto len = leftZoneEntries[i].range.getLength();
+                    leftSdrZoneProcs[i].processRegion(colors.data() + start, hdrLeftCache.data(), sampleWidth, height, 0, sampleWidth);
+                    if (leftZoneEntries[i].reversed)
+                        std::reverse(colors.data() + start, colors.data() + start + len);
+                }
             }
-            for (auto i = 0u; i < rightZoneEntries.size(); ++i)
+            if (!rightZoneEntries.empty())
             {
-                const auto start = std::min(rightZoneEntries[i].range.from, rightZoneEntries[i].range.to);
-                const auto len = rightZoneEntries[i].range.getLength();
-                rightHdrZoneProcs[i].processRegion(colors.data() + start, data, sampleWidth, height, width - sampleWidth, stridePixels);
-                if (rightZoneEntries[i].reversed)
-                    std::reverse(colors.data() + start, colors.data() + start + len);
+                hdrRightCache.resize(static_cast<size_t>(4 * sampleWidth * height));
+                const auto rightStartX = width - sampleWidth;
+                for (int y = 0; y < height; ++y)
+                    for (int x = 0; x < sampleWidth; ++x)
+                    {
+                        const auto p = data[y * stridePixels + (rightStartX + x)];
+                        const auto idx = 4 * (y * sampleWidth + x);
+                        hdrRightCache[idx]     = static_cast<uchar>(((p >> 20) & 0x3ffu) >> 2);
+                        hdrRightCache[idx + 1] = static_cast<uchar>(((p >> 10) & 0x3ffu) >> 2);
+                        hdrRightCache[idx + 2] = static_cast<uchar>((p & 0x3ffu) >> 2);
+                        hdrRightCache[idx + 3] = 0;
+                    }
+                for (auto i = 0u; i < rightZoneEntries.size(); ++i)
+                {
+                    const auto start = std::min(rightZoneEntries[i].range.from, rightZoneEntries[i].range.to);
+                    const auto len = rightZoneEntries[i].range.getLength();
+                    rightSdrZoneProcs[i].processRegion(colors.data() + start, hdrRightCache.data(), sampleWidth, height, 0, sampleWidth);
+                    if (rightZoneEntries[i].reversed)
+                        std::reverse(colors.data() + start, colors.data() + start + len);
+                }
             }
         }
 
@@ -243,10 +297,10 @@ private:
     std::vector<SdrVerticalRegionProcessor<CPP>>   leftSdrZoneProcs;
     std::vector<SdrVerticalRegionProcessor<CPP>>   rightSdrZoneProcs;
 
-    std::vector<HdrHorizontalRegionProcessor<CPP>> topHdrZoneProcs;
-    std::vector<HdrHorizontalRegionProcessor<CPP>> bottomHdrZoneProcs;
-    std::vector<HdrVerticalRegionProcessor<CPP>>   leftHdrZoneProcs;
-    std::vector<HdrVerticalRegionProcessor<CPP>>   rightHdrZoneProcs;
+    std::vector<uchar> hdrTopCache;
+    std::vector<uchar> hdrBottomCache;
+    std::vector<uchar> hdrLeftCache;
+    std::vector<uchar> hdrRightCache;
 
     std::vector<RGBColor> colors;
 };
