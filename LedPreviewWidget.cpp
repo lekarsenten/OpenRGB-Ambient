@@ -65,8 +65,8 @@ std::vector<QColor> LedPreviewWidget::collectRegionColors(ScreenRegion region) c
             }
 
             const int lo = std::min(range.from, range.to);
-            const int hi = std::max(range.from, range.to);
-            for (int i = lo; i < hi && i < static_cast<int>(colors.size()); ++i)
+            const int hi = std::min(std::max(range.from, range.to), static_cast<int>(colors.size()));
+            for (int i = hi - 1; i >= lo; --i)
             {
                 const RGBColor c = colors[i];
                 result.emplace_back(
