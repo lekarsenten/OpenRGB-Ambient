@@ -177,6 +177,40 @@ SettingsTab::SettingsTab(ResourceManagerInterface *resourceManager, Settings &se
 
     mainLayout->addLayout(extraCorrectionLayout);
 
+    // Brightness row
+    const auto brightnessLayout = new QHBoxLayout{};
+
+    const auto brightnessCheck = new QCheckBox{"Brightness", this};
+    brightnessCheck->setChecked(settings.brightnessEnabled());
+    brightnessLayout->addWidget(brightnessCheck);
+
+    const auto brightnessValueLabel = new QLabel{this};
+    auto updateBrightnessLabel = [=, &settings]() {
+        brightnessValueLabel->setText(QString("%1").arg(settings.brightness(), 0, 'f', 2));
+    };
+    updateBrightnessLabel();
+
+    const auto brightnessSlider = new QSlider{Qt::Horizontal, this};
+    brightnessSlider->setRange(0, 100);
+    brightnessSlider->setValue(static_cast<int>(settings.brightness() * 100.0f));
+    brightnessSlider->setEnabled(settings.brightnessEnabled());
+    connect(brightnessSlider, &QSlider::valueChanged, this, [=, &settings](int v) {
+        settings.setBrightness(static_cast<float>(v) / 100.0f);
+        updateBrightnessLabel();
+    });
+
+    brightnessLayout->addWidget(brightnessValueLabel);
+    brightnessLayout->addWidget(brightnessSlider);
+    brightnessLayout->addStretch();
+
+    connect(brightnessCheck, &QCheckBox::stateChanged, this, [=, &settings](int state) {
+        const bool enabled = (state == Qt::Checked);
+        settings.setBrightnessEnabled(enabled);
+        brightnessSlider->setEnabled(enabled);
+    });
+
+    mainLayout->addLayout(brightnessLayout);
+
     const auto deviceList = new DeviceList{resourceManager, settings};
     connect(this, &SettingsTab::controllerListChanged, deviceList, &DeviceList::fillControllerList);
     connect(deviceList, &DeviceList::controllerSelected, regionsWidget, &RegionsWidget::selectController);

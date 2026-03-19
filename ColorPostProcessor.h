@@ -57,4 +57,20 @@ struct SaturatingColorPostProcessor
     }
 };
 
+template<ColorPostProcessor Inner>
+struct BrightnessColorPostProcessor
+{
+    float brightness;  // [0.0, 1.0]; 1.0 = full brightness, 0.0 = off
+    Inner inner;
+
+    [[nodiscard]] inline RGBColor process(uchar red, uchar green, uchar blue, RGBColor previous) const noexcept {
+        const RGBColor result = inner.process(red, green, blue, previous);
+        return ToRGBColor(
+                static_cast<uchar>(RGBGetRValue(result) * brightness),
+                static_cast<uchar>(RGBGetGValue(result) * brightness),
+                static_cast<uchar>(RGBGetBValue(result) * brightness)
+        );
+    }
+};
+
 #endif //OPENRGB_AMBIENT_COLORPOSTPROCESSOR_H

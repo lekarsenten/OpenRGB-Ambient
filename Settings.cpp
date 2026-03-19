@@ -25,6 +25,8 @@ QString Settings::MONITOR_OUTPUT_KEY     = "MonitorOutput";     // NOLINT(cert-e
 QString Settings::COLOR_CORRECTION_ENABLED_KEY = "ColorCorrectionEnabled"; // NOLINT(cert-err58-cpp)
 QString Settings::SATURATION_BOOST_KEY   = "SaturationBoost";  // NOLINT(cert-err58-cpp)
 QString Settings::WALL_COLOR_KEY         = "WallColor";         // NOLINT(cert-err58-cpp)
+QString Settings::BRIGHTNESS_ENABLED_KEY = "BrightnessEnabled"; // NOLINT(cert-err58-cpp)
+QString Settings::BRIGHTNESS_VALUE_KEY   = "BrightnessValue";   // NOLINT(cert-err58-cpp)
 
 Settings::Settings(const QString &file, QObject *parent)
     : QObject{parent}
@@ -65,6 +67,9 @@ Settings::Settings(const QString &file, QObject *parent)
     colorCorrectionEnabledValue = settings.value(COLOR_CORRECTION_ENABLED_KEY, false).toBool();
     saturationBoostValue = settings.value(SATURATION_BOOST_KEY, 1.0f).toFloat();
     wallColorValue = QColor::fromRgb(settings.value(WALL_COLOR_KEY, QColor(Qt::white).rgb()).toUInt());
+
+    brightnessEnabledValue = settings.value(BRIGHTNESS_ENABLED_KEY, false).toBool();
+    brightnessValue = std::clamp(settings.value(BRIGHTNESS_VALUE_KEY, 1.0f).toFloat(), 0.0f, 1.0f);
 }
 
 bool Settings::isControllerSelected(const std::string &location) const {
@@ -366,5 +371,29 @@ void Settings::setWallColor(QColor color)
 {
     wallColorValue = color;
     settings.setValue(WALL_COLOR_KEY, wallColorValue.rgb());
+    emit settingsChanged();
+}
+
+bool Settings::brightnessEnabled() const noexcept
+{
+    return brightnessEnabledValue;
+}
+
+void Settings::setBrightnessEnabled(bool value)
+{
+    brightnessEnabledValue = value;
+    settings.setValue(BRIGHTNESS_ENABLED_KEY, brightnessEnabledValue);
+    emit settingsChanged();
+}
+
+float Settings::brightness() const noexcept
+{
+    return brightnessValue;
+}
+
+void Settings::setBrightness(float value)
+{
+    brightnessValue = std::clamp(value, 0.0f, 1.0f);
+    settings.setValue(BRIGHTNESS_VALUE_KEY, brightnessValue);
     emit settingsChanged();
 }

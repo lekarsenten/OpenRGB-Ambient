@@ -79,6 +79,12 @@ public:
     [[nodiscard]] QColor wallColor() const noexcept;
     void setWallColor(QColor color);
 
+    [[nodiscard]] bool brightnessEnabled() const noexcept;
+    void setBrightnessEnabled(bool value);
+
+    [[nodiscard]] float brightness() const noexcept;
+    void setBrightness(float value);
+
 signals:
     void settingsChanged();
 
@@ -103,6 +109,8 @@ private:
     static QString COLOR_CORRECTION_ENABLED_KEY;
     static QString SATURATION_BOOST_KEY;
     static QString WALL_COLOR_KEY;
+    static QString BRIGHTNESS_ENABLED_KEY;
+    static QString BRIGHTNESS_VALUE_KEY;
 
     using RegionMap     = std::unordered_map<std::string, LedRange>;
     using ZonePartsMap  = std::unordered_map<std::string, std::vector<ZonePart>>; // key: "location|zoneName"
@@ -133,6 +141,9 @@ private:
     bool  colorCorrectionEnabledValue = false;
     float saturationBoostValue        = 1.0f;
     QColor wallColorValue             = Qt::white;
+
+    bool  brightnessEnabledValue = false;
+    float brightnessValue        = 1.0f;
 
     void syncSelectedControllers();
     void syncDisabledZones();

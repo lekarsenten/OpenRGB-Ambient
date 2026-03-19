@@ -175,6 +175,9 @@ void OpenRGBAmbientPlugin::updateProcessors()
     const float saturation = colorCorrectionOn ? settings->saturationBoost() : 1.0f;
     const bool hasSaturation = saturation != 1.0f;
 
+    const bool hasBrightness = settings->brightnessEnabled() && settings->brightness() < 1.0f;
+    const float brightnessVal = settings->brightness();
+
     const auto &controllers = resourceManager->GetRGBControllers();
     for (const auto controller : controllers)
     {
@@ -182,7 +185,11 @@ void OpenRGBAmbientPlugin::updateProcessors()
             continue;
 
         auto makeProcessor = [&](auto cpp) {
-            processors.emplace_back(createProcessor(controller, colorFactors, cpp));
+            if (hasBrightness)
+                processors.emplace_back(createProcessor(controller, colorFactors,
+                    BrightnessColorPostProcessor<decltype(cpp)>{brightnessVal, cpp}));
+            else
+                processors.emplace_back(createProcessor(controller, colorFactors, cpp));
         };
 
         if (hasSaturation && smoothTransitions)
