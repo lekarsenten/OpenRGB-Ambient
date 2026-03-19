@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include <QColor>
 #include <QSettings>
 #include <QObject>
 
@@ -69,6 +70,15 @@ public:
     [[nodiscard]] float smoothTransitionsWeight() const noexcept;
     void setSmoothTransitionsWeight(float value);
 
+    [[nodiscard]] bool colorCorrectionEnabled() const noexcept;
+    void setColorCorrectionEnabled(bool value);
+
+    [[nodiscard]] float saturationBoost() const noexcept;
+    void setSaturationBoost(float value);
+
+    [[nodiscard]] QColor wallColor() const noexcept;
+    void setWallColor(QColor color);
+
 signals:
     void settingsChanged();
 
@@ -90,6 +100,9 @@ private:
     static QString ZONE_MAPPING_LOCATIONS_KEY;
     static QString MONITOR_ADAPTER_KEY;
     static QString MONITOR_OUTPUT_KEY;
+    static QString COLOR_CORRECTION_ENABLED_KEY;
+    static QString SATURATION_BOOST_KEY;
+    static QString WALL_COLOR_KEY;
 
     using RegionMap     = std::unordered_map<std::string, LedRange>;
     using ZonePartsMap  = std::unordered_map<std::string, std::vector<ZonePart>>; // key: "location|zoneName"
@@ -115,7 +128,11 @@ private:
     int colorTemperatureIndex = 55; // 6500K
 
     bool smoothing = false;
-    float smoothingWeight = 0.5;
+    float smoothingWeight = 0.5f;
+
+    bool  colorCorrectionEnabledValue = false;
+    float saturationBoostValue        = 1.0f;
+    QColor wallColorValue             = Qt::white;
 
     void syncSelectedControllers();
     void syncDisabledZones();

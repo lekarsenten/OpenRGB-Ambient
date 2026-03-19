@@ -159,13 +159,40 @@ void OpenRGBAmbientPlugin::updateProcessors()
     auto colorFactors = colorTemperatureFactors[settings->colorTemperatureFactorIndex()];
     colorFactors[2] *= blueCompensation;
 
+    const bool colorCorrectionOn = settings->colorCorrectionEnabled();
+
+    if (colorCorrectionOn)
+    {
+        const auto wall = settings->wallColor();
+        const float wallR = static_cast<float>(wall.red());
+        const float wallG = static_cast<float>(wall.green());
+        const float wallB = static_cast<float>(wall.blue());
+        if (wallR > 0) colorFactors[0] *= 255.0f / wallR;
+        if (wallG > 0) colorFactors[1] *= 255.0f / wallG;
+        if (wallB > 0) colorFactors[2] *= 255.0f / wallB;
+    }
+
+    const float saturation = colorCorrectionOn ? settings->saturationBoost() : 1.0f;
+    const bool hasSaturation = saturation != 1.0f;
+
     const auto &controllers = resourceManager->GetRGBControllers();
     for (const auto controller : controllers)
     {
         if (!settings->isControllerSelected(controller->location))
             continue;
 
-        processors.emplace_back(smoothTransitions ? createProcessor(controller, colorFactors, SmoothingColorPostProcessor{smoothTransitionsWeight}) : createProcessor(controller, colorFactors, IdentityColorPostProcessor{}));
+        auto makeProcessor = [&](auto cpp) {
+            processors.emplace_back(createProcessor(controller, colorFactors, cpp));
+        };
+
+        if (hasSaturation && smoothTransitions)
+            makeProcessor(SaturatingColorPostProcessor<SmoothingColorPostProcessor>{saturation, {smoothTransitionsWeight}});
+        else if (hasSaturation)
+            makeProcessor(SaturatingColorPostProcessor<IdentityColorPostProcessor>{saturation, {}});
+        else if (smoothTransitions)
+            makeProcessor(SmoothingColorPostProcessor{smoothTransitionsWeight});
+        else
+            makeProcessor(IdentityColorPostProcessor{});
     }
 
     stopFlag = false;
