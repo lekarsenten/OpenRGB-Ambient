@@ -455,6 +455,8 @@ void OpenRGBAmbientPlugin::processUpdate(const LedUpdateEvent &event)
             writeRange(settings->getBottomRegion(location));
             writeRange(settings->getLeftRegion(location));
             writeRange(settings->getRightRegion(location));
+
+            (*controller)->UpdateLEDs();
         }
         else
         {
@@ -477,10 +479,10 @@ void OpenRGBAmbientPlugin::processUpdate(const LedUpdateEvent &event)
                     for (int j = lo; j < hi && j < static_cast<int>(colors.size()); ++j)
                         (*controller)->SetColor(j, colors[j]);
                 }
+
+                (*controller)->UpdateZoneLEDs(static_cast<int>(i));
             }
         }
-
-        (*controller)->UpdateLEDs();
 
         emit ledColorsUpdated(QString::fromStdString(location), colors);
     }
