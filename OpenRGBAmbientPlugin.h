@@ -87,6 +87,9 @@ private:
     // that updates already queued on the event loop cannot light the LEDs back up.
     std::atomic_bool ledsOff{false};
 
+    std::atomic_bool profileDefaultPending{false};
+    std::atomic_bool profileCleared{false};
+
     QTimer *debounceTimer = nullptr;
 
     std::vector<std::unique_ptr<ImageProcessorBase>> processors;
@@ -97,6 +100,8 @@ private:
     void stopCapture();
 
     void destroyEndSessionWindow();
+
+    void applyProfileEnabled(bool enabled);
 
     void processImage(const std::shared_ptr<ID3D11Texture2D> &image);
     void processUpdate(const LedUpdateEvent &event);

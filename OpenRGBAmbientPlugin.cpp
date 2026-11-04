@@ -2,6 +2,8 @@
 
 #include <windows.h>
 
+#include <QThread>
+
 #include "ColorConversion.h"
 #include "LedUpdateEvent.h"
 #include "ZoneMapping.h"
@@ -13,6 +15,7 @@
 
 #include "OpenRGBAmbientPlugin.h"
 
+#include <ProfileManager.h>
 #include <ResourceManagerCallback.h>
 
 using namespace std::chrono_literals;
@@ -152,15 +155,20 @@ void OpenRGBAmbientPlugin::ResourceManagerUpdated(unsigned update_reason)
 
 void OpenRGBAmbientPlugin::OnProfileAboutToLoad()
 {
+    profileDefaultPending = !profileCleared.exchange(false);
+    applyProfileEnabled(false);
 }
 
 void OpenRGBAmbientPlugin::OnProfileLoad(nlohmann::json profile_data)
 {
+    profileDefaultPending = false;
+    const auto it = profile_data.find("Enabled");
+    applyProfileEnabled(it == profile_data.end() || !it->is_boolean() || it->get<bool>());
 }
 
 nlohmann::json OpenRGBAmbientPlugin::OnProfileSave()
 {
-    return {};
+    return {{"Enabled", settings->enabled()}};
 }
 
 unsigned char* OpenRGBAmbientPlugin::OnSDKCommand(unsigned pkt_id, unsigned char* pkt_data, unsigned* pkt_size)
@@ -170,10 +178,26 @@ unsigned char* OpenRGBAmbientPlugin::OnSDKCommand(unsigned pkt_id, unsigned char
 
 void OpenRGBAmbientPlugin::ProfileManagerUpdated(unsigned update_reason)
 {
+    if (update_reason != PROFILEMANAGER_UPDATE_REASON_ACTIVE_PROFILE_CHANGED)
+        return;
+
+    if (profileDefaultPending.exchange(false))
+        QMetaObject::invokeMethod(settings, [this] { settings->setEnabled(true, false); });
+    else if (QThread::currentThread() == thread())
+    {
+        profileCleared = true;
+        QMetaObject::invokeMethod(this, [this] { profileCleared = false; }, Qt::QueuedConnection);
+    }
 }
 
 void OpenRGBAmbientPlugin::SettingsManagerUpdated(unsigned update_reason)
 {
+}
+
+void OpenRGBAmbientPlugin::applyProfileEnabled(bool enabled)
+{
+    const auto connection = QThread::currentThread() == thread() ? Qt::DirectConnection : Qt::BlockingQueuedConnection;
+    QMetaObject::invokeMethod(settings, [this, enabled] { settings->setEnabled(enabled, false); }, connection);
 }
 
 void OpenRGBAmbientPlugin::setPreview(bool enabled)
@@ -226,7 +250,8 @@ void OpenRGBAmbientPlugin::updateProcessors()
     const auto &controllers = pluginApiPtr->GetRGBControllers();
     for (const auto controller : controllers)
     {
-        if (!settings->isControllerSelected(controller->GetLocation()))
+        const auto location = controller->GetLocation();
+        if (!settings->isControllerSelected(location) || !settings->isAmbientEnabled(location))
             continue;
 
         // Zone resizes are only signalled to the controller's own callbacks, not to plugins.
@@ -336,7 +361,8 @@ void OpenRGBAmbientPlugin::turnOffLeds()
     const auto &controllers = pluginApiPtr->GetRGBControllers();
     for (const auto controller : controllers)
     {
-        if (settings->isControllerSelected(controller->GetLocation()))
+        const auto location = controller->GetLocation();
+        if (settings->isControllerSelected(location) && settings->isAmbientEnabled(location))
         {
             controller->SetAllColors(0);
             controller->UpdateLEDs();
@@ -429,10 +455,10 @@ void OpenRGBAmbientPlugin::processImage(const std::shared_ptr<ID3D11Texture2D> &
 
 void OpenRGBAmbientPlugin::processUpdate(const LedUpdateEvent &event)
 {
-    if (ledsOff.load(std::memory_order::relaxed))
-        return;
-
     const auto &location = event.getControllerLocation();
+
+    if (ledsOff.load(std::memory_order::relaxed) || !settings->isAmbientEnabled(location))
+        return;
 
     const auto &controllers = pluginApiPtr->GetRGBControllers();
     const auto controller = std::ranges::find_if(controllers, [&](auto controller) {

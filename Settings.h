@@ -81,8 +81,14 @@ public:
     [[nodiscard]] float brightness() const noexcept;
     void setBrightness(float value);
 
+    [[nodiscard]] bool enabled() const noexcept;
+    void setEnabled(bool value, bool save);
+
+    [[nodiscard]] bool isAmbientEnabled(const std::string &location) const;
+
 signals:
     void settingsChanged();
+    void enabledChanged(bool enabled);
 
 private:
     static QString SELECTED_CONTROLLERS_KEY;
@@ -107,6 +113,7 @@ private:
     static QString WALL_COLOR_KEY;
     static QString BRIGHTNESS_ENABLED_KEY;
     static QString BRIGHTNESS_VALUE_KEY;
+    static QString ENABLED_KEY;
 
     using RegionMap     = std::unordered_map<std::string, LedRange>;
     using ZonePartsMap  = std::unordered_map<std::string, std::vector<ZonePart>>; // key: "location|zoneName"
@@ -140,6 +147,8 @@ private:
 
     bool  brightnessEnabledValue = false;
     float brightnessValue        = 1.0f;
+
+    bool enabledValue = true;
 
     void syncSelectedControllers();
     void syncDisabledZones();

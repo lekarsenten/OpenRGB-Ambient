@@ -107,6 +107,14 @@ RegionsWidget::RegionsWidget(OpenRGBPluginAPIInterface *pluginInterface, Setting
     const auto zoneLayout = new QVBoxLayout{zoneContainer};
     zoneLayout->setContentsMargins(0, 0, 0, 0);
 
+    const auto enabledBtn = new QCheckBox{"Zone ambient enabled (all zone devices)"};
+    enabledBtn->setChecked(settings.enabled());
+    connect(enabledBtn, &QCheckBox::clicked, this, [this](bool checked) {
+        this->settings.setEnabled(checked, true);
+    });
+    connect(&settings, &Settings::enabledChanged, enabledBtn, &QCheckBox::setChecked);
+    zoneLayout->addWidget(enabledBtn);
+
     zonesContainer = new QWidget{};
     zonesLayout = new QFormLayout{zonesContainer};
     zonesLayout->setContentsMargins(0, 0, 0, 0);

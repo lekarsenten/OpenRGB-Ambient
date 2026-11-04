@@ -23,6 +23,7 @@ QString Settings::SATURATION_BOOST_KEY   = "SaturationBoost";  // NOLINT(cert-er
 QString Settings::WALL_COLOR_KEY         = "WallColor";         // NOLINT(cert-err58-cpp)
 QString Settings::BRIGHTNESS_ENABLED_KEY = "BrightnessEnabled"; // NOLINT(cert-err58-cpp)
 QString Settings::BRIGHTNESS_VALUE_KEY   = "BrightnessValue";   // NOLINT(cert-err58-cpp)
+QString Settings::ENABLED_KEY            = "Enabled";           // NOLINT(cert-err58-cpp)
 
 Settings::Settings(const QString &file, QObject *parent)
     : QObject{parent}
@@ -66,6 +67,8 @@ Settings::Settings(const QString &file, QObject *parent)
 
     brightnessEnabledValue = settings.value(BRIGHTNESS_ENABLED_KEY, false).toBool();
     brightnessValue = std::clamp(settings.value(BRIGHTNESS_VALUE_KEY, 1.0f).toFloat(), 0.0f, 1.0f);
+
+    enabledValue = settings.value(ENABLED_KEY, true).toBool();
 }
 
 bool Settings::isControllerSelected(const std::string &location) const {
@@ -392,4 +395,27 @@ void Settings::setBrightness(float value)
     brightnessValue = std::clamp(value, 0.0f, 1.0f);
     settings.setValue(BRIGHTNESS_VALUE_KEY, brightnessValue);
     emit settingsChanged();
+}
+
+bool Settings::enabled() const noexcept
+{
+    return enabledValue;
+}
+
+void Settings::setEnabled(bool value, bool save)
+{
+    if (save)
+        settings.setValue(ENABLED_KEY, value);
+
+    if (enabledValue == value)
+        return;
+
+    enabledValue = value;
+    emit enabledChanged(enabledValue);
+    emit settingsChanged();
+}
+
+bool Settings::isAmbientEnabled(const std::string &location) const
+{
+    return enabledValue || getMappingMode(location) == MappingMode::Standard;
 }
